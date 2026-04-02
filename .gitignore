@@ -1,0 +1,15 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+.cache/
+.clangd/
+.idea/
+.vscode/
+
+*.VC.db
+*.VC.opendb
+*.code-workspace
+*.sln
+compile_commands.json

@@ -11,6 +11,7 @@ stay isolated from each other.
 - `UnrealAzeroth.uplugin`: plugin descriptor
 - `Source/UnrealAzeroth`: runtime module
 - `Source/UnrealAzerothEditor`: editor-only module
+- `docs/UnrealAzerothDesign.md`: architecture and subsystem design
 
 ## Local Build
 

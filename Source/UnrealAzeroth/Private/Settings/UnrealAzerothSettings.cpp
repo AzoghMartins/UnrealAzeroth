@@ -4,7 +4,7 @@
 
 UUnrealAzerothSettings::UUnrealAzerothSettings()
 {
-    AuthServerHost = TEXT("127.0.0.1");
+    ServerHost = TEXT("127.0.0.1");
     AuthServerPort = 3724;
 }
 

@@ -39,19 +39,16 @@ struct UNREALAZEROTH_API FUnrealAzerothClientDataScanResult
     FString ResolvedClientDataPath;
 
     UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
-    FString ResolvedServerDataPath;
+    FString ResolvedServerHost;
 
     UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
-    FString ResolvedAzerothCoreSourcePath;
+    int32 ResolvedAuthServerPort = 0;
 
     UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
     bool bClientDataPathExists = false;
 
     UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
-    bool bServerDataPathExists = false;
-
-    UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
-    bool bAzerothCoreSourcePathExists = false;
+    bool bHasServerHost = false;
 
     UPROPERTY(BlueprintReadOnly, Category="Unreal Azeroth")
     bool bUsedLocalBootstrapFile = false;

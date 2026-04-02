@@ -14,8 +14,8 @@ struct FUnrealAzerothResolvedPaths
 {
     FString PluginBaseDir;
     FString ClientDataPath;
-    FString ServerDataPath;
-    FString AzerothCoreSourcePath;
+    FString ServerHost;
+    int32 AuthServerPort = 3724;
     bool bUsedLocalBootstrapFile = false;
     FString LocalBootstrapFilePath;
 };
@@ -109,8 +109,8 @@ FUnrealAzerothResolvedPaths ResolvePaths(const UUnrealAzerothSettings& Settings)
     FUnrealAzerothResolvedPaths ResolvedPaths;
 
     ResolvedPaths.ClientDataPath = NormalizeDirectoryPath(Settings.ClientDataDirectory.Path);
-    ResolvedPaths.ServerDataPath = NormalizeDirectoryPath(Settings.ServerDataDirectory.Path);
-    ResolvedPaths.AzerothCoreSourcePath = NormalizeDirectoryPath(Settings.AzerothCoreSourceDirectory.Path);
+    ResolvedPaths.ServerHost = Settings.ServerHost;
+    ResolvedPaths.AuthServerPort = Settings.AuthServerPort;
 
     const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("UnrealAzeroth"));
     if (!Plugin.IsValid())
@@ -135,12 +135,8 @@ FUnrealAzerothResolvedPaths ResolvePaths(const UUnrealAzerothSettings& Settings)
     }
 
     ApplyBootstrapValue(JsonObject, TEXT("clientData"), ResolvedPaths.ClientDataPath);
-    ApplyBootstrapValue(JsonObject, TEXT("serverData"), ResolvedPaths.ServerDataPath);
-    ApplyBootstrapValue(JsonObject, TEXT("azerothCoreSource"), ResolvedPaths.AzerothCoreSourcePath);
 
     ResolvedPaths.ClientDataPath = NormalizeDirectoryPath(ResolvedPaths.ClientDataPath);
-    ResolvedPaths.ServerDataPath = NormalizeDirectoryPath(ResolvedPaths.ServerDataPath);
-    ResolvedPaths.AzerothCoreSourcePath = NormalizeDirectoryPath(ResolvedPaths.AzerothCoreSourcePath);
     ResolvedPaths.bUsedLocalBootstrapFile = true;
 
     return ResolvedPaths;
@@ -159,8 +155,8 @@ FUnrealAzerothClientDataScanResult FUnrealAzerothClientDataScanner::Scan(const U
     FUnrealAzerothClientDataScanResult Result;
     Result.PluginBaseDir = ResolvedPaths.PluginBaseDir;
     Result.ResolvedClientDataPath = ResolvedPaths.ClientDataPath;
-    Result.ResolvedServerDataPath = ResolvedPaths.ServerDataPath;
-    Result.ResolvedAzerothCoreSourcePath = ResolvedPaths.AzerothCoreSourcePath;
+    Result.ResolvedServerHost = ResolvedPaths.ServerHost;
+    Result.ResolvedAuthServerPort = ResolvedPaths.AuthServerPort;
     Result.bUsedLocalBootstrapFile = ResolvedPaths.bUsedLocalBootstrapFile;
     Result.LocalBootstrapFilePath = ResolvedPaths.LocalBootstrapFilePath;
 
@@ -168,6 +164,8 @@ FUnrealAzerothClientDataScanResult FUnrealAzerothClientDataScanner::Scan(const U
     {
         Result.Messages.Add(FString::Printf(TEXT("Using local bootstrap file: %s"), *Result.LocalBootstrapFilePath));
     }
+
+    Result.Messages.Add(TEXT("Realm/world server ports are discovered from the authserver and are not configured locally."));
 
     if (Result.PluginBaseDir.IsEmpty())
     {
@@ -187,30 +185,15 @@ FUnrealAzerothClientDataScanResult FUnrealAzerothClientDataScanner::Scan(const U
         }
     }
 
-    if (Result.ResolvedServerDataPath.IsEmpty())
+    Result.bHasServerHost = !Result.ResolvedServerHost.IsEmpty();
+    if (!Result.bHasServerHost)
     {
-        Result.Messages.Add(TEXT("Server data directory is not configured yet."));
-    }
-    else
-    {
-        Result.bServerDataPathExists = IFileManager::Get().DirectoryExists(*Result.ResolvedServerDataPath);
-        if (!Result.bServerDataPathExists)
-        {
-            Result.Errors.Add(FString::Printf(TEXT("Server data directory does not exist: %s"), *Result.ResolvedServerDataPath));
-        }
+        Result.Errors.Add(TEXT("Server IP address is not configured."));
     }
 
-    if (Result.ResolvedAzerothCoreSourcePath.IsEmpty())
+    if (Result.ResolvedAuthServerPort < 1 || Result.ResolvedAuthServerPort > 65535)
     {
-        Result.Messages.Add(TEXT("AzerothCore source directory is not configured yet."));
-    }
-    else
-    {
-        Result.bAzerothCoreSourcePathExists = IFileManager::Get().DirectoryExists(*Result.ResolvedAzerothCoreSourcePath);
-        if (!Result.bAzerothCoreSourcePathExists)
-        {
-            Result.Errors.Add(FString::Printf(TEXT("AzerothCore source directory does not exist: %s"), *Result.ResolvedAzerothCoreSourcePath));
-        }
+        Result.Errors.Add(FString::Printf(TEXT("Auth server port is invalid: %d"), Result.ResolvedAuthServerPort));
     }
 
     if (!Result.bClientDataPathExists)

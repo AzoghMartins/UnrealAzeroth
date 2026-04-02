@@ -18,8 +18,8 @@ void LogClientDataScanResult()
     UE_LOG(LogUnrealAzeroth, Display, TEXT("UnrealAzeroth client data scan started."));
     UE_LOG(LogUnrealAzeroth, Display, TEXT("Plugin base dir: %s"), *Result.PluginBaseDir);
     UE_LOG(LogUnrealAzeroth, Display, TEXT("Client data dir: %s"), *Result.ResolvedClientDataPath);
-    UE_LOG(LogUnrealAzeroth, Display, TEXT("Server data dir: %s"), *Result.ResolvedServerDataPath);
-    UE_LOG(LogUnrealAzeroth, Display, TEXT("AzerothCore source dir: %s"), *Result.ResolvedAzerothCoreSourcePath);
+    UE_LOG(LogUnrealAzeroth, Display, TEXT("Server host: %s"), *Result.ResolvedServerHost);
+    UE_LOG(LogUnrealAzeroth, Display, TEXT("Auth server port: %d"), Result.ResolvedAuthServerPort);
 
     for (const FString& Message : Result.Messages)
     {

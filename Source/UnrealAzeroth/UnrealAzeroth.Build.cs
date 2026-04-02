@@ -16,7 +16,10 @@ public class UnrealAzeroth : ModuleRules
             new[]
             {
                 "CoreUObject",
-                "Engine"
+                "DeveloperSettings",
+                "Engine",
+                "Json",
+                "Projects"
             });
     }
 }

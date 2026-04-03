@@ -44,7 +44,7 @@ void UUnrealAzerothLoginAsyncAction::Activate()
                 Action->OnSuccess.Broadcast(
                     Session,
                     Session->Realms,
-                    FString::Printf(TEXT("Authenticated %s and discovered %d realm(s)."), *Session->AccountName, Session->Realms.Num()));
+                    FString::Printf(TEXT("Authenticated %s and found %d available realm(s)."), *Session->AccountName, Session->Realms.Num()));
             }
             else
             {

@@ -22,6 +22,7 @@ namespace
 {
 constexpr int32 ConnectTimeoutMs = 10'000;
 constexpr int32 IoTimeoutMs = 10'000;
+constexpr int32 RealmAvailabilityTimeoutMs = 1'500;
 constexpr int32 MaxWorldPacketSizeWithOpcode = 1024 * 1024;
 constexpr uint16 WowClientBuild = 12340;
 
@@ -49,6 +50,7 @@ constexpr int32 LocalErrorUnsupportedSecurity = 1004;
 constexpr int32 LocalErrorInvalidSession = 1005;
 constexpr int32 LocalErrorRealmAddress = 1006;
 constexpr int32 LocalErrorCryptoFailure = 1007;
+constexpr int32 LocalErrorNoAvailableRealms = 1008;
 
 constexpr uint8 GameNameBytes[4] = { 'W', 'o', 'w', ' ' };
 constexpr uint8 PlatformBytes[4] = { '6', '8', 'x', 0x00 };
@@ -520,7 +522,7 @@ private:
 class FSocketClient
 {
 public:
-    bool Connect(const FString& Host, int32 Port, FString& OutError)
+    bool Connect(const FString& Host, int32 Port, FString& OutError, int32 TimeoutMs = ConnectTimeoutMs)
     {
         ISocketSubsystem& SocketSubsystem = *ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
         const FString PortString = FString::FromInt(Port);
@@ -557,7 +559,7 @@ public:
             const bool bPendingConnect = ConnectError == SE_EWOULDBLOCK || ConnectError == SE_EINPROGRESS || ConnectError == SE_NO_ERROR;
 
             if ((bConnectStarted || bPendingConnect) &&
-                Candidate->Wait(ESocketWaitConditions::WaitForWrite, FTimespan::FromMilliseconds(ConnectTimeoutMs)) &&
+                Candidate->Wait(ESocketWaitConditions::WaitForWrite, FTimespan::FromMilliseconds(TimeoutMs)) &&
                 Candidate->GetConnectionState() == ESocketConnectionState::SCS_Connected)
             {
                 Socket = MoveTemp(Candidate);
@@ -932,6 +934,29 @@ bool ParseRealmAddress(const FString& Address, FString& OutHost, int32& OutPort)
     OutHost = MoveTemp(Host);
     OutPort = Port;
     return true;
+}
+
+bool TryConnectToRealm(FUnrealAzerothRealmInfo& RealmInfo, FString& OutError)
+{
+    if (RealmInfo.bOffline)
+    {
+        OutError = TEXT("The authserver flagged the realm as offline.");
+        return false;
+    }
+
+    FString RealmHost = RealmInfo.Host;
+    int32 RealmPort = RealmInfo.Port;
+    if ((RealmHost.IsEmpty() || RealmPort <= 0) && !ParseRealmAddress(RealmInfo.Address, RealmHost, RealmPort))
+    {
+        OutError = TEXT("The realm does not contain a valid host:port address.");
+        return false;
+    }
+
+    RealmInfo.Host = RealmHost;
+    RealmInfo.Port = RealmPort;
+
+    FSocketClient RealmSocketClient;
+    return RealmSocketClient.Connect(RealmHost, RealmPort, OutError, RealmAvailabilityTimeoutMs);
 }
 
 void InitializeWorldCrypt(const TArray<uint8>& SessionKey, FArc4& OutEncryptor, FArc4& OutDecryptor)
@@ -1616,7 +1641,38 @@ FLoginResult LoginToConfiguredServer(const FString& Username, const FString& Pas
     Result.SessionKey = MoveTemp(SrpResult.SessionKey);
     Result.Realms = MoveTemp(RealmList.Realms);
 
-    UE_LOG(LogUnrealAzeroth, Display, TEXT("Auth login succeeded for %s. Realm count: %d"), *AccountName, Result.Realms.Num());
+    const int32 DiscoveredRealmCount = Result.Realms.Num();
+    for (int32 RealmIndex = Result.Realms.Num() - 1; RealmIndex >= 0; --RealmIndex)
+    {
+        FString RealmError;
+        if (!TryConnectToRealm(Result.Realms[RealmIndex], RealmError))
+        {
+            UE_LOG(
+                LogUnrealAzeroth,
+                Warning,
+                TEXT("Skipping realm %s [%s]: %s"),
+                *Result.Realms[RealmIndex].Name,
+                *Result.Realms[RealmIndex].Address,
+                *RealmError);
+            Result.Realms.RemoveAt(RealmIndex);
+        }
+    }
+
+    if (Result.Realms.IsEmpty())
+    {
+        UE_LOG(LogUnrealAzeroth, Warning, TEXT("Auth login succeeded for %s, but none of the %d discovered realms were reachable."), *AccountName, DiscoveredRealmCount);
+        return MakeFailureResult<FLoginResult>(
+            LocalErrorNoAvailableRealms,
+            TEXT("Authentication succeeded, but no realms are currently reachable."));
+    }
+
+    UE_LOG(
+        LogUnrealAzeroth,
+        Display,
+        TEXT("Auth login succeeded for %s. Reachable realms: %d/%d"),
+        *AccountName,
+        Result.Realms.Num(),
+        DiscoveredRealmCount);
     return Result;
 }
 

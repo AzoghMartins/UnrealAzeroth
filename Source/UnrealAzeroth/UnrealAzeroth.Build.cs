@@ -19,7 +19,10 @@ public class UnrealAzeroth : ModuleRules
                 "DeveloperSettings",
                 "Engine",
                 "Json",
-                "Projects"
+                "Projects",
+                "Sockets"
             });
+
+        AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");
     }
 }

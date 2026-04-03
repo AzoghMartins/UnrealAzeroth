@@ -34,4 +34,9 @@ STORMLIBBRIDGE_API bool StormLibBridge_ReadFile(
     const char* VirtualPath,
     FStormReadFileResult* OutResult);
 
+STORMLIBBRIDGE_API bool StormLibBridge_ReadFileFromArchive(
+    const char* ArchivePath,
+    const char* VirtualPath,
+    FStormReadFileResult* OutResult);
+
 STORMLIBBRIDGE_API void StormLibBridge_FreeReadFileResult(FStormReadFileResult* Result);

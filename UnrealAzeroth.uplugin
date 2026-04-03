@@ -19,6 +19,11 @@
   ],
   "Modules": [
     {
+      "Name": "StormLib",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
       "Name": "UnrealAzeroth",
       "Type": "Runtime",
       "LoadingPhase": "Default"

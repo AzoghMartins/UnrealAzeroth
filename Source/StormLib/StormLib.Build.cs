@@ -7,8 +7,7 @@ public class StormLib : ModuleRules
     {
         Type = ModuleType.CPlusPlus;
         PCHUsage = PCHUsageMode.NoPCHs;
-
-        PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "Public"));
+        bUseUnity = false;
 
         if (Target.Platform != UnrealTargetPlatform.Linux)
         {
@@ -17,18 +16,24 @@ public class StormLib : ModuleRules
 
         string ThirdPartyRoot = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "ThirdParty", "StormLib"));
         string IncludeDir = Path.Combine(ThirdPartyRoot, "include");
-        string LibraryDir = Path.Combine(ThirdPartyRoot, "lib", "Linux");
+        string SourceLibraryDir = Path.Combine(ThirdPartyRoot, "lib", "Linux");
+        string RuntimeLibraryDir = Path.Combine("$(PluginDir)", "Binaries", "ThirdParty", "StormLib", "Linux", Target.Architecture.LinuxName);
+        string RuntimeLibraryName = "libstorm.so";
+        string RuntimeLibraryPath = Path.Combine(RuntimeLibraryDir, RuntimeLibraryName);
 
-        PublicIncludePaths.Add(IncludeDir);
-        PublicAdditionalLibraries.Add(Path.Combine(LibraryDir, "libstorm.so"));
-        PrivateRuntimeLibraryPaths.Add(LibraryDir);
+        PublicIncludePaths.Add(Path.Combine(ModuleDirectory, "Public"));
+        PublicSystemIncludePaths.Add(IncludeDir);
+        PrivateDependencyModuleNames.Add("Core");
+        PublicAdditionalLibraries.Add(RuntimeLibraryPath);
+        PublicDelayLoadDLLs.Add(RuntimeLibraryPath);
+        PublicRuntimeLibraryPaths.Add(RuntimeLibraryDir);
 
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libstorm.so"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libstorm.so.9"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libstorm.so.9.22.0"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libtomcrypt.so.1"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libtomcrypt.so.1.0.1"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libtommath.so.1"));
-        RuntimeDependencies.Add(Path.Combine(LibraryDir, "libtommath.so.1.2.1"));
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, RuntimeLibraryName), Path.Combine(SourceLibraryDir, RuntimeLibraryName), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libstorm.so.9"), Path.Combine(SourceLibraryDir, "libstorm.so.9"), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libstorm.so.9.22.0"), Path.Combine(SourceLibraryDir, "libstorm.so.9.22.0"), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libtomcrypt.so.1"), Path.Combine(SourceLibraryDir, "libtomcrypt.so.1"), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libtomcrypt.so.1.0.1"), Path.Combine(SourceLibraryDir, "libtomcrypt.so.1.0.1"), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libtommath.so.1"), Path.Combine(SourceLibraryDir, "libtommath.so.1"), StagedFileType.NonUFS);
+        RuntimeDependencies.Add(Path.Combine(RuntimeLibraryDir, "libtommath.so.1.2.1"), Path.Combine(SourceLibraryDir, "libtommath.so.1.2.1"), StagedFileType.NonUFS);
     }
 }

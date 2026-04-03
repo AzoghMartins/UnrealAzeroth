@@ -93,6 +93,45 @@ bool FUnrealAzerothMpqArchiveCollection::ReadFile(const FString& ClientDataPath,
     return true;
 }
 
+bool FUnrealAzerothMpqArchiveCollection::FindFilesInDirectory(
+    const FString& ClientDataPath,
+    const FString& DirectoryVirtualPath,
+    const FString& RequiredExtension,
+    TArray<FString>& OutVirtualPaths,
+    FString& OutErrorMessage)
+{
+    OutVirtualPaths.Reset();
+
+    FString ErrorMessage;
+    if (!EnsureMounted(ClientDataPath, ErrorMessage))
+    {
+        OutErrorMessage = MoveTemp(ErrorMessage);
+        return false;
+    }
+
+    const FString NormalizedDirectoryPath = NormalizeVirtualPath(DirectoryVirtualPath);
+    const FString NormalizedExtension = RequiredExtension.TrimStartAndEnd().TrimChar(TEXT('.')).ToLower();
+
+    for (const TPair<FString, FString>& Entry : CanonicalVirtualPathMap)
+    {
+        const FString& NormalizedVirtualPath = Entry.Key;
+        if (FPaths::GetPath(NormalizedVirtualPath) != NormalizedDirectoryPath)
+        {
+            continue;
+        }
+
+        if (!NormalizedExtension.IsEmpty() && !FPaths::GetExtension(NormalizedVirtualPath).Equals(NormalizedExtension, ESearchCase::IgnoreCase))
+        {
+            continue;
+        }
+
+        OutVirtualPaths.AddUnique(Entry.Value);
+    }
+
+    OutVirtualPaths.Sort();
+    return true;
+}
+
 void FUnrealAzerothMpqArchiveCollection::Reset()
 {
     Unmount();
@@ -271,35 +310,35 @@ void FUnrealAzerothMpqArchiveCollection::BuildCanonicalVirtualPathIndex()
 {
     CanonicalVirtualPathMap.Reset();
 
-    if (Handle == nullptr)
+    for (const FMountedArchive& MountedArchive : MountedArchives)
     {
-        return;
-    }
+        FTCHARToUTF8 ArchivePathUtf8(*MountedArchive.AbsolutePath);
 
-    FStormReadFileResult StormReadResult;
-    if (!StormLibBridge_ReadFile(Handle, "(listfile)", &StormReadResult))
-    {
-        return;
-    }
-
-    const FUTF8ToTCHAR ListfileText(reinterpret_cast<const UTF8CHAR*>(StormReadResult.Bytes), static_cast<int32>(StormReadResult.Size));
-    FString ListfileString(ListfileText.Length(), ListfileText.Get());
-
-    TArray<FString> Lines;
-    ListfileString.ParseIntoArrayLines(Lines, false);
-    for (FString& Line : Lines)
-    {
-        Line.TrimStartAndEndInline();
-        if (Line.IsEmpty())
+        FStormReadFileResult StormReadResult;
+        if (!StormLibBridge_ReadFileFromArchive(ArchivePathUtf8.Get(), "(listfile)", &StormReadResult))
         {
             continue;
         }
 
-        const FString CanonicalPath = ToBackslashPath(Line);
-        CanonicalVirtualPathMap.FindOrAdd(NormalizeVirtualPath(CanonicalPath), CanonicalPath);
-    }
+        const FUTF8ToTCHAR ListfileText(reinterpret_cast<const UTF8CHAR*>(StormReadResult.Bytes), static_cast<int32>(StormReadResult.Size));
+        FString ListfileString(ListfileText.Length(), ListfileText.Get());
 
-    StormLibBridge_FreeReadFileResult(&StormReadResult);
+        TArray<FString> Lines;
+        ListfileString.ParseIntoArrayLines(Lines, false);
+        for (FString& Line : Lines)
+        {
+            Line.TrimStartAndEndInline();
+            if (Line.IsEmpty())
+            {
+                continue;
+            }
+
+            const FString CanonicalPath = ToBackslashPath(Line);
+            CanonicalVirtualPathMap.FindOrAdd(NormalizeVirtualPath(CanonicalPath), CanonicalPath);
+        }
+
+        StormLibBridge_FreeReadFileResult(&StormReadResult);
+    }
 }
 
 void FUnrealAzerothMpqArchiveCollection::AddUniqueArchiveMatches(TArray<FString>& InOutArchivePaths, const FString& RootPath, const TCHAR* Pattern)

@@ -23,6 +23,12 @@ public:
     ~FUnrealAzerothMpqArchiveCollection();
 
     bool ReadFile(const FString& ClientDataPath, const FString& VirtualPath, FUnrealAzerothMpqFileReadResult& OutResult);
+    bool FindFilesInDirectory(
+        const FString& ClientDataPath,
+        const FString& DirectoryVirtualPath,
+        const FString& RequiredExtension,
+        TArray<FString>& OutVirtualPaths,
+        FString& OutErrorMessage);
     void Reset();
 
 private:

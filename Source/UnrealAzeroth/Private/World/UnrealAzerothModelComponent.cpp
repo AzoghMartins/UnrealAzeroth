@@ -1,11 +1,27 @@
 #include "World/UnrealAzerothModelComponent.h"
 
+#include "Archives/UnrealAzerothMpqArchiveCollection.h"
 #include "HAL/FileManager.h"
+#include "Engine/Texture2D.h"
+#include "Formats/UnrealAzerothBlpLoader.h"
 #include "Formats/UnrealAzerothM2Loader.h"
+#include "MaterialDomain.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "Misc/Paths.h"
 #include "Settings/UnrealAzerothSettings.h"
 #include "UObject/UnrealType.h"
 #include "UnrealAzerothLog.h"
+
+namespace
+{
+bool IsLikelyEnvTexture(const FString& VirtualPath)
+{
+    const FString LowerPath = VirtualPath.ToLower();
+    return LowerPath.Contains(TEXT("envmap")) || LowerPath.Contains(TEXT("reflection"));
+}
+}
 
 UUnrealAzerothModelComponent::UUnrealAzerothModelComponent(const FObjectInitializer& ObjectInitializer)
     : Super(ObjectInitializer)
@@ -13,6 +29,7 @@ UUnrealAzerothModelComponent::UUnrealAzerothModelComponent(const FObjectInitiali
     PrimaryComponentTick.bCanEverTick = false;
     SetCollisionEnabled(ECollisionEnabled::NoCollision);
     bUseComplexAsSimpleCollision = false;
+    PreviewMaterialAsset = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/UnrealAzeroth/Materials/M_AzerothPreview.M_AzerothPreview")));
     LastRefreshStatus = TEXT("No Azeroth asset selected.");
 }
 
@@ -59,9 +76,143 @@ void UUnrealAzerothModelComponent::ResetPreviewMesh()
 
     LastResolvedModelArchive.Reset();
     LastResolvedSkinArchive.Reset();
+    LastResolvedTextureArchive.Reset();
+    LastResolvedTexturePath.Reset();
     LoadedVertexCount = 0;
     LoadedTriangleCount = 0;
+    LoadedTextureWidth = 0;
+    LoadedTextureHeight = 0;
     ReferencedTextureCount = 0;
+    LoadedPreviewTexture = nullptr;
+    PreviewMaterialInstance = nullptr;
+}
+
+UMaterialInterface* UUnrealAzerothModelComponent::ResolvePreviewMaterial()
+{
+    return PreviewMaterialAsset.IsNull() ? nullptr : PreviewMaterialAsset.LoadSynchronous();
+}
+
+bool UUnrealAzerothModelComponent::TryApplyReferencedTexture(
+    const FString& ClientDataPath,
+    const TArray<FString>& CandidateTexturePaths,
+    FString& OutTextureStatus)
+{
+    UMaterialInterface* PreviewMaterial = ResolvePreviewMaterial();
+    if (PreviewMaterial == nullptr)
+    {
+        OutTextureStatus = TEXT("preview material asset is missing");
+        return false;
+    }
+
+    FString LastTextureError = TEXT("no referenced textures were usable");
+    for (const FString& CandidateTexturePath : CandidateTexturePaths)
+    {
+        FUnrealAzerothBlpTextureData TextureData;
+        FString TextureErrorMessage;
+        if (!FUnrealAzerothBlpLoader::LoadFirstMip(ClientDataPath, CandidateTexturePath, TextureData, TextureErrorMessage))
+        {
+            LastTextureError = FString::Printf(TEXT("'%s': %s"), *CandidateTexturePath, *TextureErrorMessage);
+            continue;
+        }
+
+        LoadedPreviewTexture = UTexture2D::CreateTransient(
+            TextureData.Width,
+            TextureData.Height,
+            PF_B8G8R8A8,
+            NAME_None,
+            TextureData.BGRA8Pixels);
+
+        if (LoadedPreviewTexture == nullptr)
+        {
+            LastTextureError = FString::Printf(TEXT("'%s': failed to create a transient Unreal texture"), *CandidateTexturePath);
+            continue;
+        }
+
+        LoadedPreviewTexture->SRGB = true;
+        LoadedPreviewTexture->AddressX = TA_Wrap;
+        LoadedPreviewTexture->AddressY = TA_Wrap;
+        LoadedPreviewTexture->NeverStream = true;
+        LoadedPreviewTexture->UpdateResource();
+
+        PreviewMaterialInstance = UMaterialInstanceDynamic::Create(PreviewMaterial, this);
+        if (PreviewMaterialInstance == nullptr)
+        {
+            LoadedPreviewTexture = nullptr;
+            LastTextureError = FString::Printf(TEXT("'%s': failed to create a material instance"), *CandidateTexturePath);
+            continue;
+        }
+
+        PreviewMaterialInstance->SetTextureParameterValue(TEXT("DiffuseTexture"), LoadedPreviewTexture);
+        SetMaterial(0, PreviewMaterialInstance);
+
+        LastResolvedTextureArchive = TextureData.TextureArchivePath;
+        LastResolvedTexturePath = TextureData.TextureVirtualPath;
+        LoadedTextureWidth = TextureData.Width;
+        LoadedTextureHeight = TextureData.Height;
+
+        OutTextureStatus = FString::Printf(
+            TEXT("loaded preview texture '%s' from '%s' (%dx%d)"),
+            *LastResolvedTexturePath,
+            *LastResolvedTextureArchive,
+            LoadedTextureWidth,
+            LoadedTextureHeight);
+        return true;
+    }
+
+    OutTextureStatus = LastTextureError;
+    return false;
+}
+
+bool UUnrealAzerothModelComponent::TryApplySiblingTextureFallback(
+    const FString& ClientDataPath,
+    const FString& ModelVirtualPath,
+    FString& OutTextureStatus)
+{
+    TArray<FString> SiblingTexturePaths;
+    FString ArchiveQueryError;
+    if (!FUnrealAzerothMpqArchiveCollection::Get().FindFilesInDirectory(
+        ClientDataPath,
+        FPaths::GetPath(ModelVirtualPath),
+        TEXT("blp"),
+        SiblingTexturePaths,
+        ArchiveQueryError))
+    {
+        OutTextureStatus = ArchiveQueryError;
+        return false;
+    }
+
+    TArray<FString> PreferredPaths;
+    TArray<FString> FallbackPaths;
+    for (const FString& CandidatePath : SiblingTexturePaths)
+    {
+        if (IsLikelyEnvTexture(CandidatePath))
+        {
+            FallbackPaths.Add(CandidatePath);
+        }
+        else
+        {
+            PreferredPaths.Add(CandidatePath);
+        }
+    }
+
+    PreferredPaths.Append(FallbackPaths);
+    if (PreferredPaths.Num() == 0)
+    {
+        OutTextureStatus = FString::Printf(
+            TEXT("no sibling BLP textures were found beside '%s'"),
+            *ModelVirtualPath);
+        return false;
+    }
+
+    FString TextureStatus;
+    if (TryApplyReferencedTexture(ClientDataPath, PreferredPaths, TextureStatus))
+    {
+        OutTextureStatus = FString::Printf(TEXT("loaded preview texture via sibling fallback: %s"), *TextureStatus);
+        return true;
+    }
+
+    OutTextureStatus = TextureStatus;
+    return false;
 }
 
 void UUnrealAzerothModelComponent::UpdateRefreshStatus(bool bEmitLog)
@@ -134,17 +285,43 @@ void UUnrealAzerothModelComponent::UpdateRefreshStatus(bool bEmitLog)
                     LoadedTriangleCount = MeshData.SourceTriangleCount;
                     ReferencedTextureCount = MeshData.ReferencedTexturePaths.Num();
 
-                    const FString TextureSuffix = ReferencedTextureCount > 0
-                        ? FString::Printf(TEXT(" (%d referenced texture path(s) discovered)"), ReferencedTextureCount)
-                        : FString();
+                    FString TextureStatusSuffix;
+                    if (ReferencedTextureCount > 0)
+                    {
+                        FString TextureStatus;
+                        if (TryApplyReferencedTexture(Settings->ClientDataDirectory.Path, MeshData.ReferencedTexturePaths, TextureStatus))
+                        {
+                            TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
+                        }
+                        else if (TryApplySiblingTextureFallback(Settings->ClientDataDirectory.Path, VirtualPath, TextureStatus))
+                        {
+                            TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
+                        }
+                        else
+                        {
+                            TextureStatusSuffix = FString::Printf(
+                                TEXT(" Preview texture fallback is active because %s."),
+                                *TextureStatus);
+                        }
+                    }
+                    else
+                    {
+                        FString TextureStatus;
+                        if (TryApplySiblingTextureFallback(Settings->ClientDataDirectory.Path, VirtualPath, TextureStatus))
+                        {
+                            TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
+                        }
+                    }
+
                     LastRefreshStatus = FString::Printf(
-                        TEXT("Loaded %d vertices and %d triangles from '%s' using '%s' and '%s'%s."),
+                        TEXT("Loaded %d vertices and %d triangles from '%s' using '%s' and '%s'. %d referenced texture path(s) discovered.%s"),
                         LoadedVertexCount,
                         LoadedTriangleCount,
                         *VirtualPath,
                         *LastResolvedModelArchive,
                         *LastResolvedSkinArchive,
-                        *TextureSuffix);
+                        ReferencedTextureCount,
+                        *TextureStatusSuffix);
                 }
             }
         }

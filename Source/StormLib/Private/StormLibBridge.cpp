@@ -37,6 +37,54 @@ const char* DuplicateCString(const char* Input)
     std::memcpy(Copy, Input, Length);
     return Copy;
 }
+
+bool ReadFileFromArchiveHandle(HANDLE ArchiveHandle, const char* ArchivePath, const char* VirtualPath, FStormReadFileResult* OutResult)
+{
+    if (ArchiveHandle == nullptr || ArchivePath == nullptr || VirtualPath == nullptr || OutResult == nullptr)
+    {
+        return false;
+    }
+
+    HANDLE FileHandle = nullptr;
+    if (!SFileOpenFileEx(ArchiveHandle, VirtualPath, SFILE_OPEN_FROM_MPQ, &FileHandle))
+    {
+        return false;
+    }
+
+    DWORD FileSizeHigh = 0;
+    const DWORD FileSizeLow = SFileGetFileSize(FileHandle, &FileSizeHigh);
+    if (FileSizeLow == SFILE_INVALID_SIZE || FileSizeHigh != 0)
+    {
+        SFileCloseFile(FileHandle);
+        return false;
+    }
+
+    std::uint8_t* Buffer = nullptr;
+    if (FileSizeLow > 0)
+    {
+        Buffer = static_cast<std::uint8_t*>(std::malloc(FileSizeLow));
+        if (Buffer == nullptr)
+        {
+            SFileCloseFile(FileHandle);
+            return false;
+        }
+    }
+
+    DWORD BytesRead = 0;
+    const bool bReadSucceeded = FileSizeLow == 0 || SFileReadFile(FileHandle, Buffer, FileSizeLow, &BytesRead, nullptr);
+    SFileCloseFile(FileHandle);
+
+    if (!bReadSucceeded || BytesRead != FileSizeLow)
+    {
+        std::free(Buffer);
+        return false;
+    }
+
+    OutResult->ArchivePath = DuplicateCString(ArchivePath);
+    OutResult->Bytes = Buffer;
+    OutResult->Size = FileSizeLow;
+    return true;
+}
 }
 
 bool StormLibBridge_OpenArchiveCollection(
@@ -117,48 +165,36 @@ bool StormLibBridge_ReadFile(
 
     for (std::size_t Index = 0; Index < Handle->Archives.size(); ++Index)
     {
-        HANDLE FileHandle = nullptr;
-        if (!SFileOpenFileEx(Handle->Archives[Index], VirtualPath, SFILE_OPEN_FROM_MPQ, &FileHandle))
+        if (ReadFileFromArchiveHandle(Handle->Archives[Index], Handle->ArchivePaths[Index].c_str(), VirtualPath, OutResult))
         {
-            continue;
+            return true;
         }
-
-        DWORD FileSizeHigh = 0;
-        const DWORD FileSizeLow = SFileGetFileSize(FileHandle, &FileSizeHigh);
-        if (FileSizeLow == SFILE_INVALID_SIZE || FileSizeHigh != 0)
-        {
-            SFileCloseFile(FileHandle);
-            return false;
-        }
-
-        std::uint8_t* Buffer = nullptr;
-        if (FileSizeLow > 0)
-        {
-            Buffer = static_cast<std::uint8_t*>(std::malloc(FileSizeLow));
-            if (Buffer == nullptr)
-            {
-                SFileCloseFile(FileHandle);
-                return false;
-            }
-        }
-
-        DWORD BytesRead = 0;
-        const bool bReadSucceeded = FileSizeLow == 0 || SFileReadFile(FileHandle, Buffer, FileSizeLow, &BytesRead, nullptr);
-        SFileCloseFile(FileHandle);
-
-        if (!bReadSucceeded || BytesRead != FileSizeLow)
-        {
-            std::free(Buffer);
-            return false;
-        }
-
-        OutResult->ArchivePath = DuplicateCString(Handle->ArchivePaths[Index].c_str());
-        OutResult->Bytes = Buffer;
-        OutResult->Size = FileSizeLow;
-        return true;
     }
 
     return false;
+}
+
+bool StormLibBridge_ReadFileFromArchive(
+    const char* ArchivePath,
+    const char* VirtualPath,
+    FStormReadFileResult* OutResult)
+{
+    if (ArchivePath == nullptr || ArchivePath[0] == '\0' || VirtualPath == nullptr || OutResult == nullptr)
+    {
+        return false;
+    }
+
+    *OutResult = FStormReadFileResult{};
+
+    HANDLE ArchiveHandle = nullptr;
+    if (!SFileOpenArchive(ArchivePath, 0, 0, &ArchiveHandle))
+    {
+        return false;
+    }
+
+    const bool bReadSucceeded = ReadFileFromArchiveHandle(ArchiveHandle, ArchivePath, VirtualPath, OutResult);
+    SFileCloseArchive(ArchiveHandle);
+    return bReadSucceeded;
 }
 
 void StormLibBridge_FreeReadFileResult(FStormReadFileResult* Result)

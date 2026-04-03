@@ -333,7 +333,7 @@ bool FUnrealAzerothM2Loader::LoadPreviewMesh(
 
         OutMeshData.Vertices.Add(ConvertPosition(SourceVertex.Position, PreviewScale));
         OutMeshData.Normals.Add(Normal);
-        OutMeshData.UV0.Add(FVector2D(SourceVertex.UV0[0], 1.0f - SourceVertex.UV0[1]));
+        OutMeshData.UV0.Add(FVector2D(SourceVertex.UV0[0], SourceVertex.UV0[1]));
         OutMeshData.VertexColors.Add(FLinearColor::White);
         OutMeshData.Tangents.Add(MakeFallbackTangent(Normal));
     }

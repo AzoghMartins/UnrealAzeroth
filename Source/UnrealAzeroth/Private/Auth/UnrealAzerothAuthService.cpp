@@ -421,7 +421,16 @@ public:
 
     bool ReadCString(FString& OutValue)
     {
-        const int32 TerminatorIndex = Data.Find(0, Offset);
+        int32 TerminatorIndex = INDEX_NONE;
+        for (int32 Index = Offset; Index < Data.Num(); ++Index)
+        {
+            if (Data[Index] == 0)
+            {
+                TerminatorIndex = Index;
+                break;
+            }
+        }
+
         if (TerminatorIndex == INDEX_NONE)
         {
             return false;

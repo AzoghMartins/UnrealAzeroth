@@ -56,7 +56,39 @@ struct UNREALAZEROTH_API FUnrealAzerothAssetReference
     {
         FString NormalizedPath = VirtualPath;
         NormalizedPath.TrimStartAndEndInline();
+        NormalizedPath.ReplaceInline(TEXT("\\"), TEXT("/"));
         return NormalizedPath;
+    }
+
+    EUnrealAzerothAssetSourceKind GetEffectiveSourceKind() const
+    {
+        if (SourceKind != EUnrealAzerothAssetSourceKind::Unknown)
+        {
+            return SourceKind;
+        }
+
+        const FString NormalizedPath = GetNormalizedVirtualPath().ToLower();
+        if (NormalizedPath.EndsWith(TEXT(".m2")))
+        {
+            return EUnrealAzerothAssetSourceKind::M2;
+        }
+
+        if (NormalizedPath.EndsWith(TEXT(".wmo")))
+        {
+            return EUnrealAzerothAssetSourceKind::WMO;
+        }
+
+        if (NormalizedPath.EndsWith(TEXT(".adt")))
+        {
+            return EUnrealAzerothAssetSourceKind::ADT;
+        }
+
+        if (NormalizedPath.EndsWith(TEXT(".blp")))
+        {
+            return EUnrealAzerothAssetSourceKind::BLP;
+        }
+
+        return EUnrealAzerothAssetSourceKind::Unknown;
     }
 };
 

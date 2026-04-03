@@ -11,7 +11,8 @@ public class UnrealAzeroth : ModuleRules
             {
                 "Core",
                 "CoreUObject",
-                "Engine"
+                "Engine",
+                "ProceduralMeshComponent"
             });
 
         PrivateDependencyModuleNames.AddRange(
@@ -21,7 +22,8 @@ public class UnrealAzeroth : ModuleRules
                 "Engine",
                 "Json",
                 "Projects",
-                "Sockets"
+                "Sockets",
+                "StormLib"
             });
 
         AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");

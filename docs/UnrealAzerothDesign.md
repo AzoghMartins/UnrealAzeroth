@@ -159,6 +159,37 @@ Responsibilities:
 This layer should start minimal. The first milestone only needs enough world
 state to prove that the network protocol bridge is working.
 
+### World actor strategy
+
+Do not build the world layer around nested child actors. That pattern becomes
+heavy and awkward once a zone contains large numbers of doodads, foliage,
+gameobjects, creatures, and players.
+
+Use this shape instead:
+
+- one reusable model/render component that knows how to resolve Azeroth asset
+  references
+- thin actor subclasses that describe world behavior and ownership
+- later, specialized managers for batched foliage and repeated static props
+
+Recommended actor split:
+
+- `AUnrealAzerothStaticAssetActor` for buildings, furniture, and general static
+  props
+- `AUnrealAzerothFoliageActor` for trees and larger natural set dressing
+- `AUnrealAzerothGameObjectActor` for server-tracked interactive objects
+- `AUnrealAzerothUnitActor` for NPCs and mobs
+- `AUnrealAzerothPlayerActor` for remote player representations
+
+Why this split:
+
+- static/foliage/gameobject content is rendered differently from animated
+  units, so the actor tree should acknowledge that early
+- gameobjects and units are usually server-driven, while many static props are
+  editor-placed
+- a shared render/model component keeps the future MPQ loader in one place
+  instead of duplicating asset logic across actor classes
+
 #### `AzerothArchives`
 
 Provides a virtual file system over local MPQ archives.

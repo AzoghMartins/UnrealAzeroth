@@ -9,13 +9,14 @@ public class UnrealAzeroth : ModuleRules
         PublicDependencyModuleNames.AddRange(
             new[]
             {
-                "Core"
+                "Core",
+                "CoreUObject",
+                "Engine"
             });
 
         PrivateDependencyModuleNames.AddRange(
             new[]
             {
-                "CoreUObject",
                 "DeveloperSettings",
                 "Engine",
                 "Json",

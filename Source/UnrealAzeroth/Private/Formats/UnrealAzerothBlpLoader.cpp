@@ -428,13 +428,14 @@ bool DecodeArgb8888Texture(
 bool FUnrealAzerothBlpLoader::LoadFirstMip(
     const FString& ClientDataPath,
     const FString& VirtualPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
     FUnrealAzerothBlpTextureData& OutTextureData,
     FString& OutErrorMessage)
 {
     OutTextureData = FUnrealAzerothBlpTextureData{};
 
     FUnrealAzerothMpqFileReadResult ReadResult;
-    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, VirtualPath, ReadResult))
+    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, ArchivePreference, VirtualPath, ReadResult))
     {
         OutErrorMessage = MoveTemp(ReadResult.ErrorMessage);
         return false;

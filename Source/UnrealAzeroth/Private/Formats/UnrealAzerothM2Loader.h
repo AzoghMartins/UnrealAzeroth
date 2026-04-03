@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ProceduralMeshComponent.h"
+#include "World/UnrealAzerothWorldTypes.h"
 
 struct FUnrealAzerothM2MeshData
 {
@@ -24,6 +25,7 @@ public:
     static bool LoadPreviewMesh(
         const FString& ClientDataPath,
         const FString& VirtualPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
         float PreviewScale,
         bool bGenerateDoubleSidedPreview,
         FUnrealAzerothM2MeshData& OutMeshData,

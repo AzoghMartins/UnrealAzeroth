@@ -31,6 +31,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Unreal Azeroth|Asset")
     bool bGenerateDoubleSidedPreview = true;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Unreal Azeroth|Asset")
+    EUnrealAzerothArchivePreference PreviewArchivePreference = EUnrealAzerothArchivePreference::OriginalOnly;
+
     UPROPERTY(EditDefaultsOnly, Category="Unreal Azeroth|Rendering", AdvancedDisplay)
     TSoftObjectPtr<UMaterialInterface> PreviewMaterialAsset;
 
@@ -83,8 +86,16 @@ protected:
 private:
     void ResetPreviewMesh();
     void UpdateRefreshStatus(bool bEmitLog);
-    bool TryApplyReferencedTexture(const FString& ClientDataPath, const TArray<FString>& CandidateTexturePaths, FString& OutTextureStatus);
-    bool TryApplySiblingTextureFallback(const FString& ClientDataPath, const FString& ModelVirtualPath, FString& OutTextureStatus);
+    bool TryApplyReferencedTexture(
+        const FString& ClientDataPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
+        const TArray<FString>& CandidateTexturePaths,
+        FString& OutTextureStatus);
+    bool TryApplySiblingTextureFallback(
+        const FString& ClientDataPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
+        const FString& ModelVirtualPath,
+        FString& OutTextureStatus);
     UMaterialInterface* ResolvePreviewMaterial();
 
     UPROPERTY(Transient)

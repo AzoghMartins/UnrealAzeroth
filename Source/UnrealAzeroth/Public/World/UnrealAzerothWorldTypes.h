@@ -31,6 +31,13 @@ enum class EUnrealAzerothWorldUpdateMode : uint8
     Hybrid UMETA(DisplayName="Hybrid")
 };
 
+UENUM(BlueprintType)
+enum class EUnrealAzerothArchivePreference : uint8
+{
+    PatchedPreferred UMETA(DisplayName="Patched Client Archives"),
+    OriginalOnly UMETA(DisplayName="Original Client Archives Only")
+};
+
 USTRUCT(BlueprintType)
 struct UNREALAZEROTH_API FUnrealAzerothAssetReference
 {

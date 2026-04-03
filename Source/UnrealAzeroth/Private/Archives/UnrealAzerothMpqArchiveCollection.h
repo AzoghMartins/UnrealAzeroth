@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "World/UnrealAzerothWorldTypes.h"
 
 struct FStormArchiveCollectionHandle;
 struct FStormReadFileResult;
@@ -22,9 +23,14 @@ public:
 
     ~FUnrealAzerothMpqArchiveCollection();
 
-    bool ReadFile(const FString& ClientDataPath, const FString& VirtualPath, FUnrealAzerothMpqFileReadResult& OutResult);
+    bool ReadFile(
+        const FString& ClientDataPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
+        const FString& VirtualPath,
+        FUnrealAzerothMpqFileReadResult& OutResult);
     bool FindFilesInDirectory(
         const FString& ClientDataPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
         const FString& DirectoryVirtualPath,
         const FString& RequiredExtension,
         TArray<FString>& OutVirtualPaths,
@@ -39,7 +45,10 @@ private:
         int32 Priority = 0;
     };
 
-    bool EnsureMounted(const FString& ClientDataPath, FString& OutErrorMessage);
+    bool EnsureMounted(
+        const FString& ClientDataPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
+        FString& OutErrorMessage);
     bool TryReadFileFromMountedArchives(const FString& VirtualPath, FStormReadFileResult& OutStormReadResult) const;
     void BuildCanonicalVirtualPathIndex();
     void Unmount();
@@ -51,8 +60,10 @@ private:
     static void AddUniqueArchiveMatches(TArray<FString>& InOutArchivePaths, const FString& RootPath, const TCHAR* Pattern);
     static int32 CountArchivesAtRoot(const FString& RootPath);
     static int32 ComputeArchivePriority(const FString& ArchiveRoot, const FString& ArchivePath);
+    static bool ShouldIncludeArchive(const FString& ArchivePath, EUnrealAzerothArchivePreference ArchivePreference);
 
     FString MountedArchiveRoot;
+    EUnrealAzerothArchivePreference MountedArchivePreference = EUnrealAzerothArchivePreference::PatchedPreferred;
     TArray<FMountedArchive> MountedArchives;
     TMap<FString, FString> CanonicalVirtualPathMap;
     FStormArchiveCollectionHandle* Handle = nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "World/UnrealAzerothWorldTypes.h"
 
 struct FUnrealAzerothBlpTextureData
 {
@@ -17,6 +18,7 @@ public:
     static bool LoadFirstMip(
         const FString& ClientDataPath,
         const FString& VirtualPath,
+        EUnrealAzerothArchivePreference ArchivePreference,
         FUnrealAzerothBlpTextureData& OutTextureData,
         FString& OutErrorMessage);
 };

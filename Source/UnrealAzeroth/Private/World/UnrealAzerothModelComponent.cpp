@@ -94,6 +94,7 @@ UMaterialInterface* UUnrealAzerothModelComponent::ResolvePreviewMaterial()
 
 bool UUnrealAzerothModelComponent::TryApplyReferencedTexture(
     const FString& ClientDataPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
     const TArray<FString>& CandidateTexturePaths,
     FString& OutTextureStatus)
 {
@@ -109,7 +110,12 @@ bool UUnrealAzerothModelComponent::TryApplyReferencedTexture(
     {
         FUnrealAzerothBlpTextureData TextureData;
         FString TextureErrorMessage;
-        if (!FUnrealAzerothBlpLoader::LoadFirstMip(ClientDataPath, CandidateTexturePath, TextureData, TextureErrorMessage))
+        if (!FUnrealAzerothBlpLoader::LoadFirstMip(
+            ClientDataPath,
+            CandidateTexturePath,
+            ArchivePreference,
+            TextureData,
+            TextureErrorMessage))
         {
             LastTextureError = FString::Printf(TEXT("'%s': %s"), *CandidateTexturePath, *TextureErrorMessage);
             continue;
@@ -165,6 +171,7 @@ bool UUnrealAzerothModelComponent::TryApplyReferencedTexture(
 
 bool UUnrealAzerothModelComponent::TryApplySiblingTextureFallback(
     const FString& ClientDataPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
     const FString& ModelVirtualPath,
     FString& OutTextureStatus)
 {
@@ -172,6 +179,7 @@ bool UUnrealAzerothModelComponent::TryApplySiblingTextureFallback(
     FString ArchiveQueryError;
     if (!FUnrealAzerothMpqArchiveCollection::Get().FindFilesInDirectory(
         ClientDataPath,
+        ArchivePreference,
         FPaths::GetPath(ModelVirtualPath),
         TEXT("blp"),
         SiblingTexturePaths,
@@ -205,7 +213,7 @@ bool UUnrealAzerothModelComponent::TryApplySiblingTextureFallback(
     }
 
     FString TextureStatus;
-    if (TryApplyReferencedTexture(ClientDataPath, PreferredPaths, TextureStatus))
+    if (TryApplyReferencedTexture(ClientDataPath, ArchivePreference, PreferredPaths, TextureStatus))
     {
         OutTextureStatus = FString::Printf(TEXT("loaded preview texture via sibling fallback: %s"), *TextureStatus);
         return true;
@@ -258,6 +266,7 @@ void UUnrealAzerothModelComponent::UpdateRefreshStatus(bool bEmitLog)
                 if (!FUnrealAzerothM2Loader::LoadPreviewMesh(
                     Settings->ClientDataDirectory.Path,
                     VirtualPath,
+                    PreviewArchivePreference,
                     PreviewScale,
                     bGenerateDoubleSidedPreview,
                     MeshData,
@@ -289,11 +298,19 @@ void UUnrealAzerothModelComponent::UpdateRefreshStatus(bool bEmitLog)
                     if (ReferencedTextureCount > 0)
                     {
                         FString TextureStatus;
-                        if (TryApplyReferencedTexture(Settings->ClientDataDirectory.Path, MeshData.ReferencedTexturePaths, TextureStatus))
+                        if (TryApplyReferencedTexture(
+                            Settings->ClientDataDirectory.Path,
+                            PreviewArchivePreference,
+                            MeshData.ReferencedTexturePaths,
+                            TextureStatus))
                         {
                             TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
                         }
-                        else if (TryApplySiblingTextureFallback(Settings->ClientDataDirectory.Path, VirtualPath, TextureStatus))
+                        else if (TryApplySiblingTextureFallback(
+                            Settings->ClientDataDirectory.Path,
+                            PreviewArchivePreference,
+                            VirtualPath,
+                            TextureStatus))
                         {
                             TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
                         }
@@ -307,7 +324,11 @@ void UUnrealAzerothModelComponent::UpdateRefreshStatus(bool bEmitLog)
                     else
                     {
                         FString TextureStatus;
-                        if (TryApplySiblingTextureFallback(Settings->ClientDataDirectory.Path, VirtualPath, TextureStatus))
+                        if (TryApplySiblingTextureFallback(
+                            Settings->ClientDataDirectory.Path,
+                            PreviewArchivePreference,
+                            VirtualPath,
+                            TextureStatus))
                         {
                             TextureStatusSuffix = FString::Printf(TEXT(" %s."), *TextureStatus);
                         }

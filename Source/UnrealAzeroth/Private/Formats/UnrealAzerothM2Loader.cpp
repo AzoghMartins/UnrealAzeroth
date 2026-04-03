@@ -186,6 +186,7 @@ static_assert(sizeof(FUnrealAzerothM2SkinHeader) == 48, "Unexpected WotLK skin h
 bool FUnrealAzerothM2Loader::LoadPreviewMesh(
     const FString& ClientDataPath,
     const FString& VirtualPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
     const float PreviewScale,
     const bool bGenerateDoubleSidedPreview,
     FUnrealAzerothM2MeshData& OutMeshData,
@@ -194,7 +195,7 @@ bool FUnrealAzerothM2Loader::LoadPreviewMesh(
     OutMeshData = FUnrealAzerothM2MeshData{};
 
     FUnrealAzerothMpqFileReadResult ModelReadResult;
-    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, VirtualPath, ModelReadResult))
+    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, ArchivePreference, VirtualPath, ModelReadResult))
     {
         OutErrorMessage = MoveTemp(ModelReadResult.ErrorMessage);
         return false;
@@ -266,7 +267,7 @@ bool FUnrealAzerothM2Loader::LoadPreviewMesh(
     const FString SkinVirtualPath = MakeSkinVirtualPath(VirtualPath);
 
     FUnrealAzerothMpqFileReadResult SkinReadResult;
-    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, SkinVirtualPath, SkinReadResult))
+    if (!FUnrealAzerothMpqArchiveCollection::Get().ReadFile(ClientDataPath, ArchivePreference, SkinVirtualPath, SkinReadResult))
     {
         OutErrorMessage = FString::Printf(
             TEXT("'%s' loaded successfully, but its primary skin '%s' could not be read. %s"),

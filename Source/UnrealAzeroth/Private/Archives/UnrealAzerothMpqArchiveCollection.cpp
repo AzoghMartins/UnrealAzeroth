@@ -45,6 +45,17 @@ FString ToBackslashPath(const FString& InPath)
     Result.ReplaceInline(TEXT("/"), TEXT("\\"));
     return Result;
 }
+
+bool IsLetterPatchArchiveFileName(const FString& FileName)
+{
+    if (!FileName.StartsWith(TEXT("patch-")))
+    {
+        return false;
+    }
+
+    const FString Suffix = FileName.RightChop(6);
+    return Suffix.Len() == 1 && FChar::IsAlpha(Suffix[0]);
+}
 }
 
 FUnrealAzerothMpqArchiveCollection& FUnrealAzerothMpqArchiveCollection::Get()
@@ -58,13 +69,17 @@ FUnrealAzerothMpqArchiveCollection::~FUnrealAzerothMpqArchiveCollection()
     Unmount();
 }
 
-bool FUnrealAzerothMpqArchiveCollection::ReadFile(const FString& ClientDataPath, const FString& VirtualPath, FUnrealAzerothMpqFileReadResult& OutResult)
+bool FUnrealAzerothMpqArchiveCollection::ReadFile(
+    const FString& ClientDataPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
+    const FString& VirtualPath,
+    FUnrealAzerothMpqFileReadResult& OutResult)
 {
     OutResult = FUnrealAzerothMpqFileReadResult{};
     OutResult.VirtualPath = NormalizeVirtualPath(VirtualPath);
 
     FString ErrorMessage;
-    if (!EnsureMounted(ClientDataPath, ErrorMessage))
+    if (!EnsureMounted(ClientDataPath, ArchivePreference, ErrorMessage))
     {
         OutResult.ErrorMessage = MoveTemp(ErrorMessage);
         return false;
@@ -95,6 +110,7 @@ bool FUnrealAzerothMpqArchiveCollection::ReadFile(const FString& ClientDataPath,
 
 bool FUnrealAzerothMpqArchiveCollection::FindFilesInDirectory(
     const FString& ClientDataPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
     const FString& DirectoryVirtualPath,
     const FString& RequiredExtension,
     TArray<FString>& OutVirtualPaths,
@@ -103,7 +119,7 @@ bool FUnrealAzerothMpqArchiveCollection::FindFilesInDirectory(
     OutVirtualPaths.Reset();
 
     FString ErrorMessage;
-    if (!EnsureMounted(ClientDataPath, ErrorMessage))
+    if (!EnsureMounted(ClientDataPath, ArchivePreference, ErrorMessage))
     {
         OutErrorMessage = MoveTemp(ErrorMessage);
         return false;
@@ -137,7 +153,10 @@ void FUnrealAzerothMpqArchiveCollection::Reset()
     Unmount();
 }
 
-bool FUnrealAzerothMpqArchiveCollection::EnsureMounted(const FString& ClientDataPath, FString& OutErrorMessage)
+bool FUnrealAzerothMpqArchiveCollection::EnsureMounted(
+    const FString& ClientDataPath,
+    const EUnrealAzerothArchivePreference ArchivePreference,
+    FString& OutErrorMessage)
 {
     const FString ArchiveRoot = ResolveArchiveRoot(ClientDataPath);
     if (ArchiveRoot.IsEmpty())
@@ -146,7 +165,7 @@ bool FUnrealAzerothMpqArchiveCollection::EnsureMounted(const FString& ClientData
         return false;
     }
 
-    if (MountedArchiveRoot == ArchiveRoot && MountedArchives.Num() > 0)
+    if (MountedArchiveRoot == ArchiveRoot && MountedArchivePreference == ArchivePreference && MountedArchives.Num() > 0)
     {
         return true;
     }
@@ -162,6 +181,10 @@ bool FUnrealAzerothMpqArchiveCollection::EnsureMounted(const FString& ClientData
     TArray<FString> ArchivePaths;
     AddUniqueArchiveMatches(ArchivePaths, ArchiveRoot, TEXT("*.mpq"));
     AddUniqueArchiveMatches(ArchivePaths, ArchiveRoot, TEXT("*.MPQ"));
+    ArchivePaths = ArchivePaths.FilterByPredicate([ArchivePreference](const FString& ArchivePath)
+    {
+        return ShouldIncludeArchive(ArchivePath, ArchivePreference);
+    });
 
     if (ArchivePaths.Num() == 0)
     {
@@ -214,6 +237,7 @@ bool FUnrealAzerothMpqArchiveCollection::EnsureMounted(const FString& ClientData
     }
 
     MountedArchiveRoot = ArchiveRoot;
+    MountedArchivePreference = ArchivePreference;
     BuildCanonicalVirtualPathIndex();
     return true;
 }
@@ -399,4 +423,17 @@ int32 FUnrealAzerothMpqArchiveCollection::ComputeArchivePriority(const FString& 
     }
 
     return Priority;
+}
+
+bool FUnrealAzerothMpqArchiveCollection::ShouldIncludeArchive(
+    const FString& ArchivePath,
+    const EUnrealAzerothArchivePreference ArchivePreference)
+{
+    if (ArchivePreference != EUnrealAzerothArchivePreference::OriginalOnly)
+    {
+        return true;
+    }
+
+    const FString FileName = FPaths::GetBaseFilename(ArchivePath).ToLower();
+    return !IsLetterPatchArchiveFileName(FileName);
 }
